@@ -1,25 +1,96 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+output: html_document
 ---
+#Reproducible Researh - Assigment 1
+##Juan Guillermo López Guzmán
 
+In this document we are working a database based on anonymous users data. You can download the database in this url: [database](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip)
 
-## Loading and preprocessing the data
+```{r loading database,echo=FALSE}
+        db<-read.csv("C:/Users/FAMILIAR/Documents/activity.csv")
+```
 
+This is a briefly summary of database
+```{r Summary}
+        summary(db)
+```
 
+##What is mean total number of steps taken per day?  
+Firstly we will get the total steps in each day for that we will use summarize function from the dplyr library
+```{r Total steps per day,message=FALSE}
+        library(dplyr)
+        summarize(group_by(db,date),sum=sum(db$steps))
+```
+To analize the distribution of the total steps in days we will make an histogram:
+```{r,echo=FALSE}
+        plotdb<-summarize(group_by(db,date),steps=sum(db$steps))
+        hist(plotdb$steps,main="Total steps per day",xlab="")
+```
+```{r,echo=FALSE,results='hide'}
+        mean<-as.integer(mean(plotdb$steps,na.rm=TRUE))
+        median<-as.integer(median(plotdb$steps,na.rm=TRUE))
+````
+In accordance with the summary we can say the steps mean per day is `r mean` and the steps median per day is `r median`
 
-## What is mean total number of steps taken per day?
+##What is the average daily activity pattern?  
+A time series plot will show the pattern across the day:
+```{r activity pattern,echo=FALSE}
+        plotdb<-summarize(group_by(db,interval),steps=mean(db$steps,na.rm=TRUE))
+        plot(plotdb,xlab="5-minutes interval",ylab="Average steps per interval",type="l")
+```
 
+Now we need calculate the 5-minutes intervale with the maximum number of steps average. Firstly identify the maximum number after that we find the interval who contained that average:
+```{r max steps interval}
+        max_steps<-max(plotdb$steps)
+        filter<-plotdb$steps==max_steps
+        max_interval<-plotdb$interval[filter]
+```
+So now we know the maximum number of average steps is `r max_steps` in the `r max_interval` 5-minutes interval
 
+##Imputing missing values
 
-## What is the average daily activity pattern?
+The database have a 2304 total of missing value therefore to improve the data quality we will replace the NA's value with the average steps in the 5-minutes interval:
+```{r replacing NA values}
+        imp_db<-db
+        for(i in 1:length(imp_db$steps)){
+                int<-imp_db$interval[i]
+                if(is.na(imp_db$steps[i])){
+                        imp_db$steps[i]<-mean(filter(db,interval==int)$steps,na.rm=TRUE)
+                }
+        }
+```
+```{r,results='hide',echo=FALSE}
+        mean<-as.integer(mean(summarize(group_by(imp_db,date),steps=sum(imp_db$steps))$steps,na.rm=TRUE))
+        median<-as.integer(median(summarize(group_by(imp_db,date),steps=sum(imp_db$steps))$steps,na.rm=TRUE))
+```
+The new database have an `r mean` average steps per day and `r median` median. We will see the new distribution with a histogram:
+```{r histogram in improved database}
+        plotdb<-summarize(group_by(imp_db,date),steps=sum(imp_db$steps))
+        hist(plotdb$steps,main="Total steps per day",xlab="")
+```
 
+##Are there differences in activity patterns between weekdays and weekends?
 
+To examine this question we will use the `weekdays()` function and add a column with the factor weekend or weekdays
+```{r}
+        imp_db$date<-strptime(imp_db$date,format="%Y-%m-%d")
+        imp_db$WD<-weekdays(imp_db$date)
+        for(i in 1:length(imp_db$WD)){
+                if(imp_db$WD[i]=="sábado"||imp_db$WD[i]=="domingo"){
+                        imp_db$WD[i]<-"weekend"
+                        }else{
+                                imp_db$WD[i]<-"weekday"
+                                }
+                }
+```
+In adition we plot a comparative timeline graph between weekdays and weekends:
+```{r,echo=FALSE}
+        imp_db<-imp_db[-2]        
+        plotdb<-summarize(group_by(imp_db,WD,interval),steps=mean(imp_db$steps,na.rm=TRUE))
+        library(lattice)
+        xyplot(steps~interval|WD,data=plotdb,type="l",layout=c(1,2))
+        wday_mean<-mean(filter(imp_db,WD=="weekday")$steps)
+        wend_mean<-mean(filter(imp_db,WD=="weekend")$steps)
+```
 
-## Imputing missing values
-
-
-
-## Are there differences in activity patterns between weekdays and weekends?
+This graphic shows how the users walk more on weekend with an average steps per interval of `r wend_mean` versus the `r wday_mean` in weekdays
